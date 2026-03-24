@@ -1,0 +1,1 @@
+# BugScanner reporter package

@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BugScanner Security Report — {{ meta.target }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 12px;
+            color: #212121;
+            background: #fff;
+            line-height: 1.6;
+        }
+        .cover {
+            background: linear-gradient(135deg, #0d47a1 0%, #1565c0 50%, #1976d2 100%);
+            color: white;
+            padding: 60px 40px;
+            min-height: 200px;
+        }
+        .cover h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+        .cover .subtitle { font-size: 14px; opacity: 0.85; }
+        .cover .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 24px;
+        }
+        .cover .meta-item { background: rgba(255,255,255,0.15); border-radius: 8px; padding: 12px 16px; }
+        .cover .meta-item .label { font-size: 10px; opacity: 0.75; text-transform: uppercase; letter-spacing: 0.5px; }
+        .cover .meta-item .value { font-size: 14px; font-weight: 600; margin-top: 4px; }
+        .risk-badge {
+            display: inline-block;
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 13px;
+            color: white;
+        }
+        .risk-CRITICAL { background: #d32f2f; }
+        .risk-HIGH { background: #f44336; }
+        .risk-MEDIUM { background: #ff9800; }
+        .risk-LOW { background: #2196f3; }
+        .risk-INFO { background: #9e9e9e; }
+
+        .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #0d47a1;
+            border-bottom: 2px solid #1565c0;
+            padding-bottom: 8px;
+            margin: 32px 0 16px 0;
+        }
+
+        .disclaimer {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 16px;
+            border-radius: 4px;
+            margin-bottom: 24px;
+        }
+        .disclaimer strong { color: #e65100; }
+
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+        }
+        .summary-table th {
+            background: #1565c0;
+            color: white;
+            padding: 10px 14px;
+            text-align: left;
+        }
+        .summary-table td {
+            padding: 9px 14px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .summary-table tr:nth-child(even) td { background: #f5f5f5; }
+
+        .finding-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            margin-bottom: 28px;
+            overflow: hidden;
+            page-break-inside: avoid;
+        }
+        .finding-header {
+            padding: 14px 18px;
+            color: white;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .finding-header .finding-number { opacity: 0.85; font-size: 11px; }
+        .finding-header .finding-title { font-size: 14px; margin-top: 2px; }
+        .bg-CRITICAL { background: #d32f2f; }
+        .bg-HIGH     { background: #f44336; }
+        .bg-MEDIUM   { background: #ff9800; }
+        .bg-LOW      { background: #2196f3; }
+        .bg-INFO     { background: #9e9e9e; }
+
+        .finding-body { padding: 16px 18px; }
+        .finding-meta {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .meta-chip {
+            background: #f5f5f5;
+            border-radius: 6px;
+            padding: 8px 12px;
+        }
+        .meta-chip .chip-label { font-size: 10px; color: #757575; text-transform: uppercase; }
+        .meta-chip .chip-value { font-weight: 600; font-size: 12px; margin-top: 2px; }
+
+        .section-label {
+            font-weight: 700;
+            font-size: 12px;
+            color: #1565c0;
+            margin: 14px 0 6px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .poc-block {
+            background: #1e1e1e;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 8px 0;
+        }
+        .http-block {
+            background: #263238;
+            color: #cfd8dc;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            margin: 6px 0;
+            max-height: 200px;
+        }
+
+        .confirmed-yes { color: #2e7d32; font-weight: 600; }
+        .confirmed-no  { color: #f57f17; font-weight: 600; }
+
+        .refs-list { list-style: none; padding: 0; }
+        .refs-list li::before { content: "→ "; color: #1565c0; }
+        .refs-list li { margin: 3px 0; }
+        .refs-list a { color: #1565c0; text-decoration: none; }
+
+        .checklist-table { width: 100%; border-collapse: collapse; }
+        .checklist-table th {
+            background: #1565c0; color: white; padding: 8px 12px; text-align: left;
+        }
+        .checklist-table td { padding: 7px 12px; border-bottom: 1px solid #e0e0e0; }
+        .checklist-table tr:nth-child(even) td { background: #f9f9f9; }
+
+        .footer {
+            text-align: center;
+            color: #9e9e9e;
+            font-size: 10px;
+            margin-top: 40px;
+            padding-top: 16px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        @media print {
+            .finding-card { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ═══ Cover ═══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+    <h1>🛡️ Security Assessment Report</h1>
+    <div class="subtitle">BugScanner — Professional Vulnerability Assessment Tool</div>
+
+    <div class="meta-grid">
+        <div class="meta-item">
+            <div class="label">Target</div>
+            <div class="value">{{ meta.target }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="label">Assessment Date</div>
+            <div class="value">{{ report_date }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="label">Overall Risk</div>
+            <div class="value">
+                <span class="risk-badge risk-{{ overall_risk }}">{{ overall_risk }}</span>
+            </div>
+        </div>
+        <div class="meta-item">
+            <div class="label">Total Findings</div>
+            <div class="value">{{ total }}</div>
+        </div>
+        <div class="meta-item">
+            <div class="label">Scan Duration</div>
+            <div class="value">{{ meta.duration_seconds }}s</div>
+        </div>
+        <div class="meta-item">
+            <div class="label">Scanner Version</div>
+            <div class="value">{{ meta.scanner_version }}</div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+
+    <!-- ═══ Disclaimer ══════════════════════════════════════════════════════ -->
+    <div class="disclaimer">
+        <strong>⚠️ Ethical Use Disclaimer:</strong>
+        This report was generated by BugScanner for <strong>authorized security testing only</strong>.
+        All findings should be responsibly disclosed to the target organization.
+        Unauthorized use is illegal under CFAA, Computer Misuse Act, and similar legislation.
+    </div>
+
+    <!-- ═══ Summary ═════════════════════════════════════════════════════════ -->
+    <div class="section-title">Executive Summary</div>
+
+    <p>A web application security assessment was conducted against
+    <strong>{{ meta.target }}</strong> on {{ report_date }}.
+    The assessment covered <strong>{{ meta.modules_run | length }}</strong> vulnerability
+    categories from the OWASP Top 10 (2021).</p>
+
+    <br>
+
+    <table class="summary-table">
+        <thead>
+            <tr>
+                <th>Severity</th>
+                <th>Count</th>
+                <th>Risk Description</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><span class="risk-badge risk-CRITICAL">CRITICAL</span></td>
+                <td><strong>{{ counts.CRITICAL }}</strong></td>
+                <td>Requires immediate remediation — direct exploitation possible</td>
+            </tr>
+            <tr>
+                <td><span class="risk-badge risk-HIGH">HIGH</span></td>
+                <td><strong>{{ counts.HIGH }}</strong></td>
+                <td>Significant security impact — prioritize remediation</td>
+            </tr>
+            <tr>
+                <td><span class="risk-badge risk-MEDIUM">MEDIUM</span></td>
+                <td><strong>{{ counts.MEDIUM }}</strong></td>
+                <td>Moderate impact — remediate within normal release cycle</td>
+            </tr>
+            <tr>
+                <td><span class="risk-badge risk-LOW">LOW</span></td>
+                <td><strong>{{ counts.LOW }}</strong></td>
+                <td>Minor impact — best-practice improvements recommended</td>
+            </tr>
+            <tr>
+                <td><span class="risk-badge risk-INFO">INFO</span></td>
+                <td><strong>{{ counts.INFO }}</strong></td>
+                <td>Informational — no direct security impact</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- ═══ Findings ═════════════════════════════════════════════════════════ -->
+    <div class="section-title">Technical Findings</div>
+
+    {% for finding in findings %}
+    <div class="finding-card">
+        <div class="finding-header bg-{{ finding.severity }}">
+            <div class="finding-number">Finding {{ loop.index }} of {{ total }}</div>
+            <div class="finding-title">{{ finding.title }}</div>
+        </div>
+        <div class="finding-body">
+            <div class="finding-meta">
+                <div class="meta-chip">
+                    <div class="chip-label">CVSS Score</div>
+                    <div class="chip-value">{{ "%.1f"|format(finding.cvss_score) }} / 10.0</div>
+                </div>
+                <div class="meta-chip">
+                    <div class="chip-label">OWASP</div>
+                    <div class="chip-value">{{ finding.owasp }}</div>
+                </div>
+                <div class="meta-chip">
+                    <div class="chip-label">CWE</div>
+                    <div class="chip-value">{{ finding.cwe }}</div>
+                </div>
+                <div class="meta-chip">
+                    <div class="chip-label">Parameter</div>
+                    <div class="chip-value">{{ finding.parameter[:30] }}</div>
+                </div>
+                <div class="meta-chip">
+                    <div class="chip-label">Confirmed</div>
+                    <div class="chip-value">
+                        {% if finding.confirmed %}
+                        <span class="confirmed-yes">✅ Yes</span>
+                        {% else %}
+                        <span class="confirmed-no">⚠️ Potential</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="meta-chip">
+                    <div class="chip-label">URL</div>
+                    <div class="chip-value" style="font-size:10px; word-break:break-all;">{{ finding.url[:50] }}</div>
+                </div>
+            </div>
+
+            <div class="section-label">Description</div>
+            <p>{{ finding.description }}</p>
+
+            <div class="section-label">Impact</div>
+            <p>{{ finding.impact }}</p>
+
+            <div class="section-label">Proof of Concept</div>
+            <div class="poc-block">{{ finding.payload[:300] }}</div>
+
+            {% if finding.evidence %}
+            <div class="section-label">HTTP Evidence — Request</div>
+            <div class="http-block">{{ finding.evidence.method }} {{ finding.evidence.url }}
+{% for k, v in finding.evidence.request_headers.items() %}{{ k }}: {{ v }}
+{% endfor %}
+{% if finding.evidence.request_body %}
+{{ finding.evidence.request_body[:500] }}
+{% endif %}
+</div>
+            <div class="section-label">HTTP Evidence — Response</div>
+            <div class="http-block">HTTP/1.1 {{ finding.evidence.status_code }}
+{% for k, v in finding.evidence.response_headers.items() %}{{ k }}: {{ v }}
+{% endfor %}
+
+{{ (finding.evidence.response_body or '')[:600] }}</div>
+            {% endif %}
+
+            <div class="section-label">Remediation</div>
+            <p>{{ finding.remediation }}</p>
+
+            {% if finding.cvss_vector %}
+            <div class="section-label">CVSS 3.1 Vector</div>
+            <code style="font-size:10px; background:#f5f5f5; padding:3px 8px; border-radius:3px;">{{ finding.cvss_vector }}</code>
+            {% endif %}
+
+            {% if finding.references %}
+            <div class="section-label">References</div>
+            <ul class="refs-list">
+                {% for ref in finding.references %}
+                <li><a href="{{ ref }}">{{ ref }}</a></li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    <!-- ═══ Checklist ════════════════════════════════════════════════════════ -->
+    <div class="section-title">Remediation Checklist</div>
+
+    <table class="checklist-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Finding</th>
+                <th>Severity</th>
+                <th>CVSS</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for finding in findings %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ finding.title[:65] }}</td>
+                <td><span class="risk-badge risk-{{ finding.severity }}" style="font-size:10px;">{{ finding.severity }}</span></td>
+                <td>{{ "%.1f"|format(finding.cvss_score) }}</td>
+                <td>☐ Open</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>Report generated by <strong>BugScanner v{{ meta.scanner_version }}</strong> — {{ report_date }}</p>
+        <p>For authorized security testing only | EC-Council Bug Bounty Assessment Tool</p>
+    </div>
+
+</div>
+</body>
+</html>
