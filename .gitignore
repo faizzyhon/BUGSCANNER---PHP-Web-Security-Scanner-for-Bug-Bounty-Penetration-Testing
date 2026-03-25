@@ -31,3 +31,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# API
+AI Keys/
+

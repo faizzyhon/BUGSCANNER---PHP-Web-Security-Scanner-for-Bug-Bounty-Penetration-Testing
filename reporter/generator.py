@@ -366,7 +366,7 @@ class ReportGenerator:
             ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, -1), 10),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#90caf9")),
-            ("ROWBACKGROUND", (0, 0), (-1, -1), [colors.white, colors.HexColor("#fafafa")]),
+            ("ROWBACKGROUNDS", (0, 0), (-1, -1), [colors.white, colors.HexColor("#fafafa")]),
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
             ("LEFTPADDING", (0, 0), (-1, -1), 8),
         ]))
@@ -402,7 +402,7 @@ class ReportGenerator:
 
             block = []
             title_para = Paragraph(
-                f'<font color="#{sev_color.hexval().lstrip("#")}">[{sev}]</font> '
+                f'<font color="#{sev_color.hexval()[2:]}">[{sev}]</font> '
                 f'{i}. {finding.get("title", "Unknown")}',
                 h2_style,
             )
@@ -466,7 +466,7 @@ class ReportGenerator:
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTSIZE", (0, 0), (-1, -1), 9),
             ("GRID", (0, 0), (-1, -1), 0.3, colors.grey),
-            ("ROWBACKGROUND", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fafafa")]),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#fafafa")]),
         ]))
         story.append(chk_table)
         story.append(Spacer(1, 0.3*inch))

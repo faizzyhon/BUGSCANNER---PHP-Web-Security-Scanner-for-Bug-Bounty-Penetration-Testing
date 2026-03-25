@@ -20,13 +20,13 @@ import json
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urljoin
 
 import click
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
-from rich.text import Text
 from rich import box
 
 # Internal imports
@@ -46,6 +46,12 @@ from scanners.headers import HeadersScanner
 from scanners.jwt_check import JWTScanner
 from scanners.payment_bypass import PaymentBypassScanner
 from scanners.php_specific import PhpSpecificScanner
+from scanners.ai_scanner import AIScanner, AIFinding
+# Phase-0 Intelligence modules
+from scanners.recon import ReconScanner
+from scanners.port_scanner import PortScanner
+from scanners.tech_detector import TechDetector
+from scanners.cve_scanner import CVEScanner
 from reporter.generator import ReportGenerator
 
 console = Console()
@@ -76,19 +82,28 @@ By using this tool you confirm:
 
 [dim]Use --i-have-permission flag to acknowledge and proceed[/dim]"""
 
+# ── Phase-0: Intelligence Modules (always run first, cannot be deselected) ────
+INTEL_REGISTRY = {
+    "recon":       ("Reconnaissance (IP/DNS/Whois/Geo/WAF)",    ReconScanner,  "A05"),
+    "ports":       ("Port Scanner (TCP/Service Detection)",      PortScanner,   "A05"),
+    "tech":        ("Technology Detector (CMS/Framework/Stack)", TechDetector,  "A05"),
+    "cve":         ("CVE Scanner (NVD Lookup + Exploit Tests)",  CVEScanner,    "A06"),
+}
+
+# ── Phase-1: Vulnerability Modules ────────────────────────────────────────────
 SCANNER_REGISTRY = {
-    "xxe": ("XXE Injection", XXEScanner, "A4"),
-    "sqli": ("SQL Injection", SQLiScanner, "A3"),
-    "xss": ("Cross-Site Scripting", XSSScanner, "A3"),
-    "ssrf": ("Server-Side Request Forgery", SSRFScanner, "A10"),
-    "idor": ("Insecure Direct Object Reference", IDORScanner, "A1"),
-    "cmdi": ("Command Injection", CMDiScanner, "A3"),
-    "lfi": ("Path Traversal / LFI", LFIScanner, "A5"),
-    "open_redirect": ("Open Redirect", OpenRedirectScanner, "A10"),
-    "headers": ("Security Misconfiguration / Headers", HeadersScanner, "A5"),
-    "jwt": ("Broken Authentication / JWT", JWTScanner, "A2"),
-    "payment": ("Crypto Payment / Balance Bypass", PaymentBypassScanner, "A1"),
-    "php":     ("PHP-Specific: DB Dump / File Access / Webshell", PhpSpecificScanner, "A5"),
+    "xxe":          ("XXE Injection",                              XXEScanner,          "A04"),
+    "sqli":         ("SQL Injection",                              SQLiScanner,         "A03"),
+    "xss":          ("Cross-Site Scripting",                       XSSScanner,          "A03"),
+    "ssrf":         ("Server-Side Request Forgery",                SSRFScanner,         "A10"),
+    "idor":         ("Insecure Direct Object Reference",           IDORScanner,         "A01"),
+    "cmdi":         ("Command Injection",                          CMDiScanner,         "A03"),
+    "lfi":          ("Path Traversal / LFI",                       LFIScanner,          "A05"),
+    "open_redirect":("Open Redirect",                              OpenRedirectScanner, "A10"),
+    "headers":      ("Security Misconfiguration / Headers",        HeadersScanner,      "A05"),
+    "jwt":          ("Broken Authentication / JWT",                JWTScanner,          "A02"),
+    "payment":      ("Crypto Payment / Balance Bypass",            PaymentBypassScanner,"A01"),
+    "php":          ("PHP-Specific: DB Dump / File Access / Shell",PhpSpecificScanner,  "A05"),
 }
 
 
@@ -170,9 +185,8 @@ def cli():
 @click.option("--target", "-t", required=True, help="Target URL (e.g. https://target.com)")
 @click.option("--i-have-permission", "permission", is_flag=True, default=False,
               help="Confirm you have explicit authorization to test this target")
-@click.option("--modules", "-m", multiple=True,
-              type=click.Choice(list(SCANNER_REGISTRY.keys()) + ["all"]),
-              default=["all"], help="Modules to run (default: all)")
+@click.option("--modules", "-m", default="all",
+              help="Comma-separated modules to run (e.g. sqli,xss,php) or 'all'")
 @click.option("--output", "-o", default="./reports", help="Output directory for reports")
 @click.option("--timeout", default=10, help="HTTP request timeout in seconds")
 @click.option("--threads", default=5, help="Concurrent request threads")
@@ -191,9 +205,29 @@ def cli():
 @click.option("--auth-type", default="auto",
               type=click.Choice(["auto", "form", "json", "basic"]),
               help="Authentication method: auto (default), form, json (API), basic (HTTP Basic)")
+# ── AI Zero-Day options ───────────────────────────────────────────────────────
+@click.option("--ai-key", default="", envvar="AI_API_KEY",
+              help="OpenAI or Anthropic API key (omit to use Ollama local/free mode)")
+@click.option("--ai-provider", default="auto",
+              type=click.Choice(["auto", "openai", "anthropic", "ollama"]),
+              help="AI provider: auto (detect from key), openai, anthropic, ollama (local/free)")
+@click.option("--ai-model", default="",
+              help="Model override (e.g. gpt-4o, claude-opus-4-5, deepseek-r1, llama3.2)")
+@click.option("--ollama-host", default="http://localhost:11434", envvar="OLLAMA_HOST",
+              help="Ollama server URL (default: http://localhost:11434)")
+@click.option("--ai-only", is_flag=True, default=False,
+              help="Run only the AI zero-day engine (skip standard modules)")
+@click.option("--skip-recon", is_flag=True, default=False,
+              help="Skip Phase-0 intelligence (recon/ports/tech/CVE) — faster but less context")
+@click.option("--skip-ports", is_flag=True, default=False,
+              help="Skip port scan only (recon still runs)")
+@click.option("--nvd-key", default="", envvar="NVD_API_KEY",
+              help="NIST NVD API key for higher rate limits (optional, free at nvd.nist.gov)")
 def scan(target, permission, modules, output, timeout, threads, cookies,
          headers_extra, depth, verbose, no_pdf, report_format,
-         username, password, login_url, auth_type):
+         username, password, login_url, auth_type,
+         ai_key, ai_provider, ai_model, ollama_host, ai_only,
+         skip_recon, skip_ports, nvd_key):
     """Run a full vulnerability scan against a target URL."""
 
     print_banner()
@@ -289,8 +323,23 @@ def scan(target, permission, modules, output, timeout, threads, cookies,
             )
     # ─── Scan Configuration Panel ─────────────────────────────────────────────
 
-    # Determine which modules to run
-    run_modules = list(SCANNER_REGISTRY.keys()) if "all" in modules else list(modules)
+    # Determine which modules to run — supports "all" or comma-separated list
+    if not modules or modules.strip().lower() == "all":
+        run_modules = list(SCANNER_REGISTRY.keys())
+    else:
+        requested = [m.strip() for m in modules.split(",") if m.strip()]
+        valid_keys = set(SCANNER_REGISTRY.keys())
+        invalid = [m for m in requested if m not in valid_keys]
+        if invalid:
+            console.print(f"[yellow]WARNING:[/yellow] Unknown module(s) ignored: {', '.join(invalid)}")
+        run_modules = [m for m in requested if m in valid_keys]
+        if not run_modules:
+            console.print("[bold red]ERROR:[/bold red] No valid modules selected. Use --modules all or a valid module name.")
+            sys.exit(1)
+
+    # Skip standard modules if --ai-only is set
+    if ai_only:
+        run_modules = []
 
     auth_status = (
         f"[green]✓ Authenticated as {username}[/green]"
@@ -299,10 +348,15 @@ def scan(target, permission, modules, output, timeout, threads, cookies,
               else "[dim]None (unauthenticated)[/dim]")
     )
 
+    intel_phases = [] if skip_recon else (
+        ["recon", "tech", "cve"] if skip_ports else ["recon", "ports", "tech", "cve"]
+    )
+
     console.print(Panel(
         f"[bold cyan]Target:[/bold cyan]  {target}\n"
         f"[bold cyan]Auth:[/bold cyan]    {auth_status}\n"
-        f"[bold cyan]Modules:[/bold cyan] {', '.join(run_modules)}\n"
+        f"[bold cyan]Intel:[/bold cyan]   {', '.join(intel_phases) if intel_phases else '(skipped)'}\n"
+        f"[bold cyan]Modules:[/bold cyan] {', '.join(run_modules) if run_modules else '(AI-only mode)'}\n"
         f"[bold cyan]Timeout:[/bold cyan] {timeout}s  |  "
         f"[bold cyan]Threads:[/bold cyan] {threads}  |  "
         f"[bold cyan]Depth:[/bold cyan] {depth}",
@@ -310,17 +364,64 @@ def scan(target, permission, modules, output, timeout, threads, cookies,
         border_style="green",
     ))
 
-    scan_start = time.time()
+    scan_start   = time.time()
     all_findings = []
+    target_info  = {"technologies": {}}   # shared context passed to CVEScanner
 
-    # ─── Run Scanners ─────────────────────────────────────────────────────────
-    with Progress(
+    # ─── Phase 0: Intelligence Gathering ─────────────────────────────────────
+    if intel_phases:
+        console.print(Panel(
+            "[bold cyan]Phase 0 — Intelligence Gathering[/bold cyan]\n"
+            "Running recon, port scan, tech detection & CVE lookup before vulnerability testing.",
+            border_style="cyan",
+        ))
+
+        for phase_key in intel_phases:
+            phase_name, PhaseClass, _ = INTEL_REGISTRY[phase_key]
+            console.print(f"\n[bold cyan]▶ {phase_name}[/bold cyan]")
+            try:
+                if phase_key == "cve":
+                    # CVEScanner needs technologies collected by TechDetector
+                    scanner = PhaseClass(
+                        target=target,
+                        http_client=http_client,
+                        scope=scope,
+                        verbose=verbose,
+                        target_info=target_info,
+                    )
+                else:
+                    scanner = PhaseClass(
+                        target=target,
+                        http_client=http_client,
+                        scope=scope,
+                        verbose=verbose,
+                    )
+                phase_findings = scanner.run()
+                all_findings.extend(phase_findings)
+
+                # Capture technologies for CVE phase
+                if phase_key == "tech" and hasattr(scanner, "technologies"):
+                    target_info["technologies"] = scanner.technologies
+                elif phase_key == "tech":
+                    # Try to get from the last TECH_JSON emitted
+                    pass
+
+            except Exception as exc:
+                logger.warning(f"Phase-0 {phase_key} error: {exc}")
+                if verbose:
+                    console.print(f"  [yellow]! {phase_name}: Error — {exc}[/yellow]")
+
+        console.print(f"\n[bold green]✓ Intelligence gathering complete — {len(all_findings)} pre-scan findings[/bold green]\n")
+
+    # ─── Phase 1: Run Vulnerability Scanners ──────────────────────────────────
+    if run_modules:
+      with Progress(
         SpinnerColumn(),
         TextColumn("[bold blue]{task.description}"),
         BarColumn(),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         console=console,
-    ) as progress:
+      ) as progress:
         task = progress.add_task("[cyan]Scanning...", total=len(run_modules))
 
         for mod_key in run_modules:
@@ -350,6 +451,63 @@ def scan(target, permission, modules, output, timeout, threads, cookies,
             progress.advance(task)
 
     scan_duration = time.time() - scan_start
+
+    # ─── AI Zero-Day Engine ───────────────────────────────────────────────────
+    ai_findings_converted = []
+    use_ai = ai_key or ai_provider == "ollama"
+
+    if use_ai:
+        is_ollama = (ai_provider == "ollama") or (not ai_key)
+        provider_label = "Ollama (local/free)" if is_ollama else ai_provider.upper()
+        console.print(Panel(
+            f"[bold green]🤖 AI Zero-Day Engine — {provider_label}[/bold green]\n"
+            "Running 7-phase AI analysis: crawl → response audit → payload gen\n"
+            "→ source audit → behavior diff → business logic → exploit chaining",
+            border_style="green",
+        ))
+        try:
+            ai_scanner = AIScanner(
+                session=http_client.session,
+                base_url=target,
+                ai_api_key=ai_key,
+                ai_provider=ai_provider,
+                ai_model=ai_model or None,
+                ollama_host=ollama_host,
+                verbose=verbose,
+            )
+            ai_raw = ai_scanner.run()
+
+            # Convert AIFinding dataclasses to standard finding dicts
+            for af in ai_raw:
+                ai_findings_converted.append({
+                    "title":     af.title,
+                    "severity":  af.severity.upper(),
+                    "url":       urljoin(target.rstrip("/") + "/", af.endpoint.lstrip("/")),
+                    "owasp":     "A00",
+                    "confirmed": af.zero_day,
+                    "description": af.description,
+                    "evidence":  af.evidence,
+                    "payload":   af.payload,
+                    "cvss":      af.cvss,
+                    "cwe":       af.cwe,
+                    "ai_generated": True,
+                    "zero_day":  af.zero_day,
+                })
+            all_findings.extend(ai_findings_converted)
+            console.print(f"  [green]✓ AI engine: {len(ai_raw)} findings ({len([f for f in ai_raw if f.zero_day])} potential zero-days)[/green]")
+
+        except ImportError as e:
+            console.print(f"  [yellow]⚠ AI engine requires extra package: {e}[/yellow]")
+            console.print("  [dim]  For cloud: pip install openai  OR  pip install anthropic[/dim]")
+            console.print("  [dim]  For local: install Ollama from https://ollama.com then: ollama pull deepseek-r1[/dim]")
+        except Exception as e:
+            console.print(f"  [yellow]⚠ AI engine error: {e}[/yellow]")
+            if verbose:
+                import traceback; traceback.print_exc()
+    else:
+        console.print(
+            "\n[dim]💡 Tip: Add --ai-provider ollama (free/local) or --ai-key <KEY> to enable AI zero-day discovery[/dim]"
+        )
 
     # ─── Display Results ──────────────────────────────────────────────────────
     if all_findings:

@@ -436,8 +436,10 @@ class AuthManager:
             pass
 
         # Redirect after POST (classic web login pattern) = success
-        if resp.status_code in (301, 302, 303) and resp.history:
-            location = resp.headers.get("Location", "")
+        # Note: _post() uses allow_redirects=True, so resp.status_code is already the
+        # final status (200), not 3xx. Use resp.history to detect that a redirect occurred.
+        if resp.history:
+            location = resp.url  # final URL after redirect(s)
             if any(s in location.lower() for s in ["dashboard", "home", "account", "profile", "welcome"]):
                 cookies = dict(self.session.cookies)
                 return AuthResult(
@@ -446,7 +448,7 @@ class AuthManager:
                     username=username,
                     login_url=login_url,
                     session_cookies=cookies,
-                    message=f"Redirected to {location} after login",
+                    message=f"Redirected to {location} after login (final status {resp.status_code})",
                     response_status=resp.status_code,
                 )
 
