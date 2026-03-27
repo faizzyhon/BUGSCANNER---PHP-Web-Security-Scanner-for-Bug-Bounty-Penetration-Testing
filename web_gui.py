@@ -955,6 +955,118 @@ function addFinding(f) {
   tbody.appendChild(row);
 }
 
+// ── Recon panel helpers ───────────────────────────────────────────────────────
+
+function kv(label, value, colorClass) {
+  const cls = colorClass ? ` class="rv ${colorClass}"` : ' class="rv"';
+  return `<div class="recon-kv"><span class="rk">${label}</span><span${cls}>${value||'&mdash;'}</span></div>`;
+}
+
+function resetReconPanel() {
+  ['recon-info-grid','card-dns','card-ports','card-tech','card-cve'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display='none';
+  });
+  document.getElementById('recon-placeholder').style.display='block';
+  ['host-kv','geo-kv','ssl-kv','waf-body','dns-body','ports-body','tech-grid','cve-body']
+    .forEach(id=>{ document.getElementById(id).innerHTML=''; });
+}
+
+function updateReconPanel(data) {
+  document.getElementById('recon-placeholder').style.display='none';
+  document.getElementById('recon-info-grid').style.display='grid';
+
+  document.getElementById('host-kv').innerHTML=
+    kv('Hostname', data.host)+
+    kv('IP Address', data.ip, 'green')+
+    kv('Reverse DNS', data.rdns)+
+    kv('Scan Time', (data.scan_time||'').replace('T',' ').slice(0,19)+' UTC');
+
+  const geo=data.geo||{};
+  document.getElementById('geo-kv').innerHTML=
+    kv('Country', geo.country?(geo.country+' ('+(geo.code||'')+')'):'—')+
+    kv('City', geo.city)+
+    kv('ISP', geo.isp)+
+    kv('Org', geo.org)+
+    kv('ASN', geo.asn);
+
+  const ssl=data.ssl||{};
+  const sslEl=document.getElementById('ssl-kv');
+  sslEl.innerHTML = ssl.error
+    ? kv('Error', ssl.error, 'red')
+    : ssl.subject
+      ? kv('Subject',ssl.subject)+kv('Issuer',ssl.issuer)+kv('Expires',ssl.not_after,'green')+
+        kv('SANs',(ssl.san||[]).slice(0,3).join(', '))
+      : kv('Status','Not HTTPS','yellow');
+
+  const wafs=data.waf||[];
+  document.getElementById('waf-body').innerHTML = wafs.length
+    ? '<div style="padding:8px 0">'+wafs.map(w=>`<span class="waf-badge">&#128737; ${w}</span>`).join('')+'</div>'
+    : kv('Detection','No WAF detected','yellow');
+
+  const dns=data.dns||{};
+  if(Object.keys(dns).length){
+    document.getElementById('card-dns').style.display='block';
+    document.getElementById('dns-body').innerHTML=Object.entries(dns).map(([type,recs])=>
+      `<div style="margin-bottom:8px"><span style="color:var(--cyan);font-size:10px;font-weight:700">${type}</span> `+
+      `<span style="color:var(--text);font-size:11px">${Array.isArray(recs)?recs.join(', '):recs}</span></div>`
+    ).join('');
+  }
+}
+
+function updatePortsPanel(data) {
+  const ports=(data.open_ports||[]);
+  if(!ports.length) return;
+  document.getElementById('card-ports').style.display='block';
+  const INTERNAL=new Set([2375,2376,5984,6379,9200,9300,11211,27017,27018]);
+  const DANGER=new Set([21,23,135,139,445,1433,1521,2049,3306,3389,5432,5900,7001]);
+  const tbody=document.getElementById('ports-body');
+  ports.forEach(p=>{
+    const critical=INTERNAL.has(p.port), danger=DANGER.has(p.port);
+    const badge=critical?'<span class="sev-badge sev-CRITICAL">CRITICAL</span>':
+                danger  ?'<span class="sev-badge sev-HIGH">HIGH</span>':
+                         '<span class="sev-badge sev-INFO">INFO</span>';
+    const tr=document.createElement('tr');
+    if(critical) tr.style.background='var(--red)08';
+    tr.innerHTML=`<td class="${critical||danger?'port-danger':'port-open'}">${p.port}/tcp</td>`+
+      `<td style="color:var(--cyan)">${p.service}</td>`+
+      `<td style="color:var(--dim);font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis">${p.banner||'&mdash;'}</td>`+
+      `<td>${badge}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function updateTechPanel(data) {
+  const techs=data.technologies||{};
+  if(!Object.keys(techs).length) return;
+  document.getElementById('card-tech').style.display='block';
+  const grid=document.getElementById('tech-grid');
+  Object.values(techs).forEach(info=>{
+    const div=document.createElement('div');
+    div.className='tech-badge';
+    div.innerHTML=`<div class="tc">${info.category}</div><div class="tn">${info.name}</div>`+
+      (info.version&&info.version!=='unknown'?`<div class="tv">v${info.version}</div>`:'');
+    grid.appendChild(div);
+  });
+}
+
+function updateCvePanel(data) {
+  const cves=(data.cves||[]).filter(c=>c.cvss>=4.0);
+  if(!cves.length) return;
+  document.getElementById('card-cve').style.display='block';
+  const tbody=document.getElementById('cve-body');
+  cves.forEach(c=>{
+    const color=c.cvss>=9?'var(--red)':c.cvss>=7?'var(--orange)':'var(--yellow)';
+    const tr=document.createElement('tr');
+    tr.className='cve-row-'+(c.severity||'MEDIUM');
+    tr.innerHTML=`<td style="color:var(--cyan);white-space:nowrap">${c.id}</td>`+
+      `<td>${c.product}${c.version&&c.version!=='unknown'?' '+c.version:''}</td>`+
+      `<td style="font-weight:700;color:${color}">${c.cvss.toFixed(1)}</td>`+
+      `<td><span class="sev-badge sev-${c.severity||'MEDIUM'}">${c.severity||'MEDIUM'}</span></td>`+
+      `<td style="color:var(--dim);font-size:11px">${(c.description||'').substring(0,90)}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 // ── Load reports ──────────────────────────────────────────────────────────────
 async function loadReports() {
   const r  = await fetch('/api/reports');
@@ -1044,6 +1156,10 @@ def scan_start():
         cmd += ["--verbose"]
     if not config.get("gen_pdf", True):
         cmd += ["--no-pdf"]
+    if config.get("skip_recon"):
+        cmd += ["--skip-recon"]
+    if config.get("skip_ports"):
+        cmd += ["--skip-ports"]
 
     # AI flags
     provider = config.get("ai_provider", "none")
@@ -1124,19 +1240,44 @@ def scan_start():
 
 
 def _detect_finding(line: str, scan_id: str):
-    """Parse scan output lines to extract findings for the results table."""
+    """
+    Parse scan output lines to:
+      1. Extract structured JSON emitted by Phase-0 modules (RECON_JSON:, PORT_JSON:, TECH_JSON:, CVE_JSON:)
+      2. Extract vulnerability findings from Rich-formatted terminal output
+    """
     import re
-    # Look for Rich markup severity patterns in output
+
+    q = scan_queues.get(scan_id)
+    if not q:
+        return
+
+    # ── Phase-0 structured JSON prefixes ─────────────────────────────────────
+    STRUCTURED_PREFIXES = {
+        "RECON_JSON:": "recon_data",
+        "PORT_JSON:":  "port_data",
+        "TECH_JSON:":  "tech_data",
+        "CVE_JSON:":   "cve_data",
+    }
+    for prefix, event_type in STRUCTURED_PREFIXES.items():
+        if line.startswith(prefix):
+            payload_str = line[len(prefix):]
+            try:
+                payload = json.loads(payload_str)
+                q.put(json.dumps({"type": event_type, "data": payload}))
+            except json.JSONDecodeError:
+                pass
+            return   # don't try finding detection on structured lines
+
+    # ── Vulnerability finding detection from terminal output ──────────────────
     sev_patterns = [
         (r"CRITICAL", "CRITICAL"),
         (r"HIGH",     "HIGH"),
         (r"MEDIUM",   "MEDIUM"),
         (r"LOW",      "LOW"),
     ]
-    clean = re.sub(r"\[.*?\]", "", line)  # strip markup
+    clean = re.sub(r"\[.*?\]", "", line)   # strip Rich markup
     for pat, sev in sev_patterns:
         if pat in clean.upper() and ("—" in clean or "-" in clean or ":" in clean):
-            # Extract title after severity indicator
             parts = re.split(r"[—\-:]", clean, maxsplit=1)
             title = parts[1].strip() if len(parts) > 1 else clean.strip()
             if len(title) > 5:
@@ -1149,8 +1290,7 @@ def _detect_finding(line: str, scan_id: str):
                     "zero_day":     "ZERO-DAY" in clean.upper(),
                 }
                 scan_results[scan_id].append(finding)
-                if scan_id in scan_queues:
-                    scan_queues[scan_id].put(json.dumps({"type": "finding", "data": finding}))
+                q.put(json.dumps({"type": "finding", "data": finding}))
                 break
 
 

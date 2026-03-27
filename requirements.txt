@@ -1,6 +1,6 @@
 # BugScanner — Professional Web Security Scanner
-# EC-Council Bug Bounty Course Assignment
-# Python 3.10+
+# Author: Muhammad Faizan (faizzyhon@gmail.com)
+# Python 3.10+  |  pip install -r requirements.txt
 
 # ── HTTP / Parsing ─────────────────────────────────────────────────────────────
 requests>=2.31.0
@@ -15,25 +15,32 @@ rich>=13.7.0
 # ── Templating ─────────────────────────────────────────────────────────────────
 Jinja2>=3.1.3
 
-# ── PDF Generation (choose one or both) ───────────────────────────────────────
+# ── PDF Generation ─────────────────────────────────────────────────────────────
 # WeasyPrint produces better HTML→PDF output:
 weasyprint>=61.0
 
-# ReportLab is used as fallback and for programmatic PDF layouts:
+# ReportLab for programmatic PDF layouts:
 reportlab>=4.1.0
 
-# ── AI Zero-Day Engine (install ONE based on your API key) ────────────────────
+# ── AI Zero-Day Engine ─────────────────────────────────────────────────────────
 # OpenAI GPT-4 (key starts with sk-):
 openai>=1.30.0
 
 # Anthropic Claude (key starts with sk-ant-):
 anthropic>=0.25.0
 
-# ── Optional: Flask Web UI ────────────────────────────────────────────────────
+# ── Phase-0 Intelligence Modules ───────────────────────────────────────────────
+# DNS record lookups (A, MX, NS, TXT, CNAME, SOA):
+dnspython>=2.6.0
+
+# Whois registration / domain info:
+python-whois>=0.9.4
+
+# ── Optional: Flask Web GUI ─────────────────────────────────────────────────────
 Flask>=3.0.0
 Flask-WTF>=1.2.0
 
-# ── Development / Testing ─────────────────────────────────────────────────────
+# ── Development / Testing ──────────────────────────────────────────────────────
 pytest>=8.0.0
 pytest-mock>=3.12.0
 responses>=0.25.0

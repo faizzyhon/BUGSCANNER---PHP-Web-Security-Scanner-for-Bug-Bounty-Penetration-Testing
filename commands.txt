@@ -1,0 +1,406 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                    BugScanner — Command Reference                            ║
+║              Author: Muhammad Faizan (faizzyhon@gmail.com)                   ║
+║              GitHub: https://github.com/faizzyhon/bugscanner                 ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  INSTALLATION
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Install all dependencies
+pip install -r requirements.txt
+
+# Linux/Mac: Install to system PATH (run once)
+chmod +x install.sh && ./install.sh
+
+# Windows: Install with desktop shortcuts
+install.bat
+
+# Verify installation
+python main.py --help
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  WEB GUI (Recommended — includes live Intel tab)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Start the Web GUI (auto-opens browser at http://localhost:5000)
+python web_gui.py
+
+# Linux quick launcher
+./run_web.sh
+
+# Windows quick launcher
+run_web.bat
+
+# Custom port
+python web_gui.py --port 8080
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FULL AUTO-SCAN (just a URL — does everything automatically)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Runs: IP/DNS/Whois → Port Scan → Tech Detection → CVE Lookup → OWASP Top 10
+
+python main.py scan \
+  --target https://target.com \
+  --i-have-permission
+
+# Same but verbose (shows each finding as it's discovered)
+python main.py scan \
+  --target https://target.com \
+  --i-have-permission \
+  --verbose
+
+# Fast scan (more threads, higher timeout)
+python main.py scan \
+  --target https://target.com \
+  --threads 20 \
+  --timeout 20 \
+  --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PHASE-0 INTELLIGENCE ONLY (no vulnerability testing)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Full recon (IP + DNS + Whois + Ports + Tech + CVE) — fastest recon run
+python main.py scan \
+  --target https://target.com \
+  --ai-only \
+  --skip-recon=False \
+  --i-have-permission
+
+# Recon + one lightweight module
+python main.py scan \
+  --target https://target.com \
+  --modules headers \
+  --i-have-permission
+
+# Skip port scan (faster, still does IP/DNS/tech/CVE)
+python main.py scan \
+  --target https://target.com \
+  --skip-ports \
+  --i-have-permission
+
+# Skip ALL Phase-0 intel (pure vuln scan, fastest)
+python main.py scan \
+  --target https://target.com \
+  --skip-recon \
+  --modules sqli,xss \
+  --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TARGET: cvvhub.tw (the original request)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Complete scan of cvvhub.tw — all phases, all modules
+python main.py scan \
+  --target https://cvvhub.tw/ \
+  --threads 15 \
+  --timeout 20 \
+  --verbose \
+  --i-have-permission
+
+# With AI zero-day (Ollama, free):
+python main.py scan \
+  --target https://cvvhub.tw/ \
+  --ai-provider ollama \
+  --ai-model deepseek-r1 \
+  --threads 15 \
+  --i-have-permission
+
+# With AI zero-day (OpenAI GPT-4):
+python main.py scan \
+  --target https://cvvhub.tw/ \
+  --ai-key sk-YOUR_OPENAI_KEY \
+  --ai-provider openai \
+  --ai-model gpt-4o \
+  --i-have-permission
+
+# With AI zero-day (Anthropic Claude):
+python main.py scan \
+  --target https://cvvhub.tw/ \
+  --ai-key sk-ant-YOUR_CLAUDE_KEY \
+  --ai-provider anthropic \
+  --ai-model claude-opus-4-5 \
+  --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  SPECIFIC VULNERABILITY MODULES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# SQL Injection only
+python main.py scan --target https://target.com --modules sqli --i-have-permission
+
+# XSS + SQLi
+python main.py scan --target https://target.com --modules sqli,xss --i-have-permission
+
+# PHP-specific attacks (DB dumps, webshell upload, file read)
+python main.py scan --target https://target.com --modules php --i-have-permission
+
+# LFI + Path Traversal
+python main.py scan --target https://target.com --modules lfi --i-have-permission
+
+# SSRF (Server-Side Request Forgery)
+python main.py scan --target https://target.com --modules ssrf --i-have-permission
+
+# XXE Injection
+python main.py scan --target https://target.com --modules xxe --i-have-permission
+
+# Command Injection
+python main.py scan --target https://target.com --modules cmdi --i-have-permission
+
+# JWT attacks + broken auth
+python main.py scan --target https://target.com --modules jwt --i-have-permission
+
+# Security headers audit
+python main.py scan --target https://target.com --modules headers --i-have-permission
+
+# Payment / balance bypass
+python main.py scan --target https://target.com --modules payment --i-have-permission
+
+# IDOR (Insecure Direct Object Reference)
+python main.py scan --target https://target.com --modules idor --i-have-permission
+
+# Open Redirect
+python main.py scan --target https://target.com --modules open_redirect --i-have-permission
+
+# Web Application Firewall-focused combo
+python main.py scan --target https://target.com \
+  --modules sqli,xss,lfi,cmdi,xxe --i-have-permission
+
+# Full OWASP Top 10 suite (no recon, faster)
+python main.py scan --target https://target.com \
+  --skip-recon \
+  --modules sqli,xss,ssrf,lfi,xxe,cmdi,idor,jwt,headers,open_redirect,payment,php \
+  --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AUTHENTICATED SCANS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Auto-detect login form and authenticate
+python main.py scan \
+  --target https://target.com \
+  --username admin \
+  --password password123 \
+  --i-have-permission
+
+# Force JSON API login (REST APIs)
+python main.py scan \
+  --target https://target.com/api \
+  --username admin@target.com \
+  --password secret \
+  --auth-type json \
+  --i-have-permission
+
+# HTTP Basic Auth
+python main.py scan \
+  --target https://target.com \
+  --username admin \
+  --password secret \
+  --auth-type basic \
+  --i-have-permission
+
+# With explicit login URL
+python main.py scan \
+  --target https://target.com \
+  --username admin \
+  --password secret \
+  --login-url https://target.com/login \
+  --i-have-permission
+
+# With session cookies (already logged in)
+python main.py scan \
+  --target https://target.com \
+  --cookies "session=abc123; PHPSESSID=xyz789; auth_token=eyJ..." \
+  --i-have-permission
+
+# With extra headers (API key, Bearer token)
+python main.py scan \
+  --target https://api.target.com \
+  --headers-extra '{"Authorization":"Bearer eyJtoken","X-Api-Key":"key123"}' \
+  --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AI ZERO-DAY ENGINE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Ollama (free, local — install Ollama first)
+python main.py scan --target https://target.com \
+  --ai-provider ollama --ai-model deepseek-r1 --i-have-permission
+
+# Ollama with custom host
+python main.py scan --target https://target.com \
+  --ai-provider ollama \
+  --ollama-host http://192.168.1.100:11434 \
+  --ai-model llama3.2 \
+  --i-have-permission
+
+# AI-only mode (skip all standard modules, AI engine only)
+python main.py scan --target https://target.com \
+  --ai-provider ollama --ai-only --i-have-permission
+
+# Via environment variable (safer, no key in history)
+export AI_API_KEY=sk-YOUR_KEY
+python main.py scan --target https://target.com --ai-provider openai --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  OUTPUT & REPORTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Custom output directory
+python main.py scan --target https://target.com \
+  --output /home/user/pentest/reports/ --i-have-permission
+
+# PDF only
+python main.py scan --target https://target.com \
+  --format pdf --i-have-permission
+
+# Markdown only (no PDF)
+python main.py scan --target https://target.com \
+  --no-pdf --i-have-permission
+
+# Both PDF and Markdown (default)
+python main.py scan --target https://target.com \
+  --format both --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  OLLAMA SETUP (for free local AI)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Install Ollama on Linux
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Install Ollama on Windows
+# Download from: https://ollama.ai/download
+
+# Start Ollama server
+ollama serve
+
+# Pull recommended models
+ollama pull deepseek-r1          # Best for security reasoning (14B)
+ollama pull qwen2.5-coder:7b     # Best for source code audit
+ollama pull llama3.2             # Fast general purpose (3B)
+ollama pull mistral:7b           # Good balance of speed/quality
+ollama pull codellama:13b        # Specialized for code analysis
+ollama pull phi3:mini            # Ultra-fast (mini model)
+ollama pull gemma2:9b            # Google's model
+
+# List installed models
+ollama list
+
+# Test Ollama is working
+curl http://localhost:11434/api/tags
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  EXAMPLE: COMPLETE PENETRATION TEST WORKFLOW
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Step 1: Start the Web GUI for live monitoring
+  python web_gui.py
+
+Step 2: In a new terminal — run full recon + vuln scan
+  python main.py scan \
+    --target https://target.com \
+    --threads 20 \
+    --timeout 20 \
+    --verbose \
+    --i-have-permission
+
+Step 3: Review the Intel tab in Web GUI for:
+  - Open ports (check for CRITICAL/HIGH risk services)
+  - Detected technologies (CMS, server, PHP version)
+  - CVEs found for detected software
+  - WAF detection (if any, plan bypasses)
+
+Step 4: Run targeted tests based on detected tech
+  # If WordPress detected:
+  python main.py scan \
+    --target https://target.com \
+    --modules sqli,xss,lfi,php \
+    --i-have-permission
+
+  # If Java/Spring detected:
+  python main.py scan \
+    --target https://target.com \
+    --modules ssrf,xxe,cmdi \
+    --i-have-permission
+
+Step 5: Run AI zero-day engine
+  python main.py scan \
+    --target https://target.com \
+    --ai-provider ollama \
+    --ai-model deepseek-r1 \
+    --ai-only \
+    --i-have-permission
+
+Step 6: Review PDF report in ./reports/ directory
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  ENVIRONMENT VARIABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+AI_API_KEY=sk-...                # OpenAI or Anthropic API key
+OLLAMA_HOST=http://localhost:11434  # Custom Ollama server URL
+NVD_API_KEY=...                  # NIST NVD key (optional, higher rate limits)
+                                    # Get free at: https://nvd.nist.gov/developers/request-an-api-key
+
+# Usage:
+export AI_API_KEY=sk-YOUR_KEY
+python main.py scan --target https://target.com --ai-provider openai --i-have-permission
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  AVAILABLE MODULES REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PHASE-0 INTELLIGENCE (always auto-runs unless --skip-recon):
+  recon          IP resolution, DNS, Whois, Geolocation, HTTP headers, WAF
+  ports          TCP port scan (70 ports), service banners, risk classification
+  tech           Technology fingerprinting (80+ signatures)
+  cve            NVD CVE database lookup + active exploit tests
+
+PHASE-1 VULNERABILITY MODULES (--modules):
+  sqli           SQL Injection
+  xss            Cross-Site Scripting (reflected, stored, DOM)
+  ssrf           Server-Side Request Forgery
+  lfi            Local File Inclusion / Path Traversal
+  xxe            XML External Entity Injection
+  cmdi           Command Injection (OS command execution)
+  idor           Insecure Direct Object Reference
+  jwt            JWT attacks (none algo, weak secret, expired)
+  headers        Security headers audit (CSP, HSTS, X-Frame-Options...)
+  open_redirect  Open Redirect vulnerabilities
+  payment        Payment / balance bypass logic flaws
+  php            PHP-specific: DB dumps, file access, webshell upload
+
+SPECIAL:
+  all            Run all Phase-1 modules (default)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# "ModuleNotFoundError: No module named 'dns'"
+pip install dnspython
+
+# "ModuleNotFoundError: No module named 'whois'"
+pip install python-whois
+
+# "Connection refused" for Ollama
+ollama serve   # Start the Ollama daemon first
+
+# NVD API rate limit (403 error)
+# Get a free API key: https://nvd.nist.gov/developers/request-an-api-key
+python main.py scan --target https://t.com --nvd-key YOUR_NVD_KEY --i-have-permission
+
+# SSL verification errors on target
+python main.py scan --target https://target.com --i-have-permission
+# (SSL verification is already disabled by default for pentesting)
+
+# Port scan too slow
+python main.py scan --target https://target.com --skip-ports --i-have-permission
+# (skips port scan, still runs recon/tech/CVE)
+
+# Python version error
+python --version   # Must be 3.10+
+python3.11 main.py scan --target https://target.com --i-have-permission
